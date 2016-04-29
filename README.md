@@ -1,6 +1,6 @@
 # ThinkX
 
-This package contains support code for books by Allen B. Downey.  It provides the following modules:
+This package contains support code for [books by Allen B. Downey](http://greenteapress.com/wp/).  It provides the following modules:
 
 * `thinkbayes`: Code for *Think Bayes*. 
 * `thinkstats2`: Code for *Think Stats, 2nd edition*
