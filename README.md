@@ -10,7 +10,7 @@ This package contains support code for books by Allen B. Downey.  It provides th
 
 `thinkstats2` and `thinkbayes2` are actually the same file, so you can import it by either name.
 
-This package is on PyPi, so you should be able to install it by running the following on the command line:
+[This package is on PyPi](https://pypi.python.org/pypi?name=thinkx&:action=display), so you should be able to install it by running the following on the command line:
 
     pip install thinkx
 
