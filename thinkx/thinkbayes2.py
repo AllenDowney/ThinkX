@@ -501,7 +501,7 @@ class Pmf(_DictWrapper):
         """
         return 1 - (self > obj)
 
-    def Normalize(self, fraction=1.0):
+    def Normalize(self, fraction=1):
         """Normalizes this PMF so the sum of all probs is fraction.
 
         Args:
@@ -513,7 +513,7 @@ class Pmf(_DictWrapper):
             raise ValueError("Normalize: Pmf is under a log transform")
 
         total = self.Total()
-        if total == 0.0:
+        if total == 0:
             raise ValueError('Normalize: total probability is zero.')
             #logging.warning('Normalize: total probability is zero.')
             #return total
@@ -1780,6 +1780,35 @@ def MakeBinomialPmf(n, p):
     for k in range(n+1):
         pmf[k] = stats.binom.pmf(k, n, p)
     return pmf
+
+
+def EvalGeometricPmf(k, p, loc=0):
+    """Evaluates the geometric PMF.
+
+    With loc=0: Probability of `k` trials to get one success.
+    With loc=-1: Probability of `k` trials before first success.
+
+    k: number of trials
+    p: probability of success on each trial
+    """
+    return stats.geom.pmf(k, p, loc=loc)
+    
+
+def MakeGeometricPmf(p, loc=0, high=10):
+    """Evaluates the binomial PMF.
+
+    With loc=0: PMF of trials to get one success.
+    With loc=-1: PMF of trials before first success.
+
+    p: probability of success
+    high: upper bound where PMF is truncated
+    """
+    pmf = Pmf()
+    for k in range(high):
+        pmf[k] = stats.geom.pmf(k, p, loc=loc)
+    pmf.Normalize()
+    return pmf
+
 
 def EvalHypergeomPmf(k, N, K, n):
     """Evaluates the hypergeometric PMF.
