@@ -6,9 +6,11 @@ from setuptools import setup
 
 
 def readme():
-    with open('README.md') as f:
-        return f.read()
-
+    try:
+        with open('README.md') as f:
+            return f.read()
+    except IOError:
+        return ''
 
 
 setup(name='thinkx',
