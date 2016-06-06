@@ -12,7 +12,6 @@ def readme():
     except IOError:
         return ''
 
-
 setup(name='thinkx',
       version='1.1',
       description='Modules supporting books by Allen Downey',

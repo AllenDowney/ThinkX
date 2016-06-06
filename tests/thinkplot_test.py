@@ -13,8 +13,8 @@ import random
 from collections import Counter
 import numpy as np
 
-from thinkx import thinkstats2
-from thinkx import thinkplot
+import thinkstats2
+import thinkplot
 
 class Test(unittest.TestCase):
 
