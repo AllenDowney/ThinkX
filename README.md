@@ -2,7 +2,7 @@
 
 This package contains support code for [books by Allen B. Downey](http://greenteapress.com/wp/).  It provides the following modules:
 
-* `thinkbayes`: Code for *Think Bayes*. 
+* `thinkbayes`: Code for *Think Bayes*.
 * `thinkstats2`: Code for *Think Stats, 2nd edition*
 * `thinkbayes2`: Code for *Think Bayes, 2nd edition*, not yet published.
 * `thinkdsp`: Code for *Think DSP*
@@ -10,9 +10,13 @@ This package contains support code for [books by Allen B. Downey](http://greente
 
 `thinkstats2` and `thinkbayes2` are actually the same file, so you can import it by either name.
 
-[This package is on PyPi](https://pypi.python.org/pypi?name=thinkx&:action=display), so you should be able to install it by running the following on the command line:
+[This package is on PyPI](https://pypi.python.org/pypi?name=thinkx&:action=display), so you should be able to install it by running the following on the command line:
 
     pip install thinkx
+
+You can also install `ThinkX` from the [conda-forge](https://conda-forge.github.io/) repository using [conda](https://www.continuum.io/downloads):
+
+    conda install thinkx -c conda-forge
 
 And then you can import whichever modules you need like this:
 
