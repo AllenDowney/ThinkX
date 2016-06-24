@@ -13,14 +13,14 @@ def readme():
         return ''
 
 setup(name='thinkx',
-      version='1.1',
+      version='1.1.2',
       description='Modules supporting books by Allen Downey',
       long_description=readme(),
       url='http://github.com/AllenDowney/ThinkX',
       author='Allen Downey',
       author_email='downey@allendowney.com',
       license='MIT',
-      py_modules=['thinkbayes2', 'thinkstats2', 'thinkplot', 'thinkdsp'],
+      py_modules=['thinkbayes', 'thinkbayes2', 'thinkstats2', 'thinkplot', 'thinkdsp'],
       install_requires=[
           'matplotlib',
           'numpy',
