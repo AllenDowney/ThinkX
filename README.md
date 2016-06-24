@@ -16,8 +16,8 @@ This package contains support code for [books by Allen B. Downey](http://greente
 
 And then you can import whichever modules you need like this:
 
-    from thinkx import thinkplot
-    from thinkx import thinkdsp
+    import thinkplot
+    import thinkdsp
     ...
 
 These modules are also distributed individually in the repositories for the books, but if you download them that way, you would not normally install them.
