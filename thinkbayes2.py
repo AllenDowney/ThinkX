@@ -183,7 +183,10 @@ class _DictWrapper(object):
             return '%s(%s, %s)' % (cls, repr(self.d), repr(self.label))
 
     def __eq__(self, other):
-        return self.d == other.d
+        try:
+            return self.d == other.d
+        except AttributeError:
+            return False
 
     def __len__(self):
         return len(self.d)
@@ -294,6 +297,26 @@ class _DictWrapper(object):
         """Gets an unsorted sequence of (value, freq/prob) pairs."""
         return self.d.items()
 
+    def SortedItems(self):
+        """Gets a sorted sequence of (value, freq/prob) pairs.
+
+        It items are unsortable, the result is unsorted.
+        """
+        def isnan(x):
+            try:
+                return math.isnan(x)
+            except TypeError:
+                return False
+
+        if any([isnan(x) for x in self.Values()]):
+            msg = 'Keys contain NaN, may not sort correctly.'
+            logging.warning(msg)
+
+        try:
+            return sorted(self.d.items())
+        except TypeError:
+            return self.d.items()
+
     def Render(self, **options):
         """Generates a sequence of points suitable for plotting.
 
@@ -302,10 +325,7 @@ class _DictWrapper(object):
         Returns:
             tuple of (sorted value sequence, freq/prob sequence)
         """
-        if min(self.d.keys()) is np.nan:
-            logging.warning('Hist: contains NaN, may not render correctly.')
-
-        return zip(*sorted(self.Items()))
+        return zip(*self.SortedItems())
 
     def MakeCdf(self, label=None):
         """Makes a Cdf."""
@@ -314,7 +334,7 @@ class _DictWrapper(object):
 
     def Print(self):
         """Prints the values and freqs/probs in ascending order."""
-        for val, prob in sorted(self.d.items()):
+        for val, prob in self.SortedItems():
             print(val, prob)
 
     def Set(self, x, y=0):
@@ -445,7 +465,7 @@ class Pmf(_DictWrapper):
 
         returns: value from the Pmf
         """
-        p = percentage / 100.0
+        p = percentage / 100
         total = 0
         for val, prob in sorted(self.Items()):
             total += prob
@@ -478,41 +498,9 @@ class Pmf(_DictWrapper):
             t = [prob for (val, prob) in self.d.items() if val < x]
             return sum(t)
 
-    def __lt__(self, obj):
-        """Less than.
-
-        obj: number or _DictWrapper
-
-        returns: float probability
-        """
-        return self.ProbLess(obj)
-
-    def __gt__(self, obj):
-        """Greater than.
-
-        obj: number or _DictWrapper
-
-        returns: float probability
-        """
-        return self.ProbGreater(obj)
-
-    def __ge__(self, obj):
-        """Greater than or equal.
-
-        obj: number or _DictWrapper
-
-        returns: float probability
-        """
-        return 1 - (self < obj)
-
-    def __le__(self, obj):
-        """Less than or equal.
-
-        obj: number or _DictWrapper
-
-        returns: float probability
-        """
-        return 1 - (self > obj)
+    # NOTE: I've decided to remove the magic comparators because they
+    # have the side-effect of making Pmf sortable, but in fact they
+    # don't support sorting.
 
     def Normalize(self, fraction=1):
         """Normalizes this PMF so the sum of all probs is fraction.
@@ -528,8 +516,6 @@ class Pmf(_DictWrapper):
         total = self.Total()
         if total == 0:
             raise ValueError('Normalize: total probability is zero.')
-            #logging.warning('Normalize: total probability is zero.')
-            #return total
 
         factor = fraction / total
         for x in self.d:
@@ -547,7 +533,7 @@ class Pmf(_DictWrapper):
             float value from the Pmf
         """
         target = random.random()
-        total = 0.0
+        total = 0
         for x, p in self.d.items():
             total += p
             if total >= target:
@@ -562,10 +548,7 @@ class Pmf(_DictWrapper):
         Returns:
             float mean
         """
-        mean = 0.0
-        for x, p in self.d.items():
-            mean += p * x
-        return mean
+        return sum(p * x for x, p in self.Items())
 
     def Var(self, mu=None):
         """Computes the variance of a PMF.
@@ -578,10 +561,15 @@ class Pmf(_DictWrapper):
         if mu is None:
             mu = self.Mean()
 
-        var = 0.0
-        for x, p in self.d.items():
-            var += p * (x - mu) ** 2
-        return var
+        return sum(p * (x-mu)**2 for x, p in self.Items())
+
+    def Expect(self, func):
+        """Computes the expectation of func(x).
+
+        Returns:
+            expectation
+        """
+        return np.sum(p * func(x) for x, p in self.Items()) 
 
     def Std(self, mu=None):
         """Computes the standard deviation of a PMF.
@@ -594,13 +582,21 @@ class Pmf(_DictWrapper):
         var = self.Var(mu)
         return math.sqrt(var)
 
-    def MaximumLikelihood(self):
+    def MAP(self):
         """Returns the value with the highest probability.
 
         Returns: float probability
         """
         _, val = max((prob, val) for val, prob in self.Items())
         return val
+
+    # Calling this function MaximumLikelihood is potentially misleading,
+    # since the highest posterior probability does not necessarily
+    # correspond to the highest likelihood.  MAP, for maximum aposteori
+    # probability, is better, but still potentially misleading because
+    # we might apply it to a Pmf that is not a posterior distribution.
+    # So I'm providing both names.
+    MaximumLikelihood = MAP
 
     def CredibleInterval(self, percentage=90):
         """Computes the central credible interval.
@@ -628,6 +624,8 @@ class Pmf(_DictWrapper):
         except AttributeError:
             return self.AddConstant(other)
 
+    __radd__ = __add__
+
     def AddPmf(self, other):
         """Computes the Pmf of the sum of values drawn from self and other.
 
@@ -648,6 +646,9 @@ class Pmf(_DictWrapper):
 
         returns: new Pmf
         """
+        if other == 0:
+            return self.Copy()
+
         pmf = Pmf()
         for v1, p1 in self.Items():
             pmf.Set(v1 + other, p1)
@@ -810,7 +811,7 @@ class Joint(Pmf):
         for prob, val in t:
             interval.append(val)
             total += prob
-            if total >= percentage / 100.0:
+            if total >= percentage / 100:
                 break
 
         return interval
@@ -946,7 +947,7 @@ def MakeUniformPmf(low, high, n):
     return pmf
 
 
-class Cdf(object):
+class Cdf:
     """Represents a cumulative distribution function.
 
     Attributes:
@@ -1037,6 +1038,11 @@ class Cdf(object):
     def __eq__(self, other):
         return np.all(self.xs == other.xs) and np.all(self.ps == other.ps)
 
+    def Print(self):
+        """Prints the values and freqs/probs in ascending order."""
+        for val, prob in zip(self.xs, self.ps):
+            print(val, prob)
+
     def Copy(self, label=None):
         """Returns a copy of this Cdf.
 
@@ -1051,11 +1057,6 @@ class Cdf(object):
         if label is None:
             label = self.label
         return Pmf(self, label=label)
-
-    def Values(self):
-        """Returns a sorted list of values.
-        """
-        return self.xs
 
     def Items(self):
         """Returns a sorted sequence of (value, probability) pairs.
@@ -1097,7 +1098,7 @@ class Cdf(object):
             float probability
         """
         if x < self.xs[0]:
-            return 0.0
+            return 0
         index = bisect.bisect(self.xs, x)
         p = self.ps[index-1]
         return p
@@ -1112,7 +1113,7 @@ class Cdf(object):
         xs = np.asarray(xs)
         index = np.searchsorted(self.xs, xs, side='right')
         ps = self.ps[index-1]
-        ps[xs < self.xs[0]] = 0.0
+        ps[xs < self.xs[0]] = 0
         return ps
 
     ProbArray = Probs
@@ -1132,8 +1133,10 @@ class Cdf(object):
         index = bisect.bisect_left(self.ps, p)
         return self.xs[index]
 
-    def ValueArray(self, ps):
+    def Values(self, ps=None):
         """Returns InverseCDF(p), the value that corresponds to probability p.
+
+        If ps is not provided, returns all values.
 
         Args:
             ps: NumPy array of numbers in the range [0, 1]
@@ -1141,12 +1144,17 @@ class Cdf(object):
         Returns:
             NumPy array of values
         """
+        if ps is None:
+            return self.xs
+
         ps = np.asarray(ps)
         if np.any(ps < 0) or np.any(ps > 1):
             raise ValueError('Probability p must be in range [0, 1]')
 
         index = np.searchsorted(self.ps, ps, side='left')
         return self.xs[index]
+
+    ValueArray = Values
 
     def Percentile(self, p):
         """Returns the value that corresponds to percentile p.
@@ -1157,7 +1165,19 @@ class Cdf(object):
         Returns:
             number value
         """
-        return self.Value(p / 100.0)
+        return self.Value(p / 100)
+
+    def Percentiles(self, ps):
+        """Returns the value that corresponds to percentiles ps.
+
+        Args:
+            ps: numbers in the range [0, 100]
+
+        Returns:
+            array of values
+        """
+        ps = np.asarray(ps)
+        return self.Values(ps / 100)
 
     def PercentileRank(self, x):
         """Returns the percentile rank of the value x.
@@ -1166,7 +1186,16 @@ class Cdf(object):
 
         returns: percentile rank in the range 0 to 100
         """
-        return self.Prob(x) * 100.0
+        return self.Prob(x) * 100
+
+    def PercentileRanks(self, xs):
+        """Returns the percentile ranks of the values in xs.
+
+        xs: potential value in the CDF
+
+        returns: array of percentile ranks in the range 0 to 100
+        """
+        return self.Probs(x) * 100
 
     def Random(self):
         """Chooses a random value from this distribution."""
@@ -1188,7 +1217,7 @@ class Cdf(object):
             float mean
         """
         old_p = 0
-        total = 0.0
+        total = 0
         for x, new_p in zip(self.xs, self.ps):
             p = new_p - old_p
             total += p * x
@@ -1206,13 +1235,13 @@ class Cdf(object):
         Returns:
             sequence of two floats, low and high
         """
-        prob = (1 - percentage / 100.0) / 2
+        prob = (1 - percentage / 100) / 2
         interval = self.Value(prob), self.Value(1 - prob)
         return interval
 
     ConfidenceInterval = CredibleInterval
 
-    def _Round(self, multiplier=1000.0):
+    def _Round(self, multiplier=1000):
         """
         An entry is added to the cdf only if the percentile differs
         from the previous value in a significant digit, where the number
@@ -1671,7 +1700,7 @@ def CredibleInterval(pmf, percentage=90):
         sequence of two floats, low and high
     """
     cdf = pmf.MakeCdf()
-    prob = (1 - percentage / 100.0) / 2
+    prob = (1 - percentage / 100) / 2
     interval = cdf.Value(prob), cdf.Value(1 - prob)
     return interval
 
@@ -1686,7 +1715,7 @@ def PmfProbLess(pmf1, pmf2):
     Returns:
         float probability
     """
-    total = 0.0
+    total = 0
     for v1, p1 in pmf1.Items():
         for v2, p2 in pmf2.Items():
             if v1 < v2:
@@ -1704,7 +1733,7 @@ def PmfProbGreater(pmf1, pmf2):
     Returns:
         float probability
     """
-    total = 0.0
+    total = 0
     for v1, p1 in pmf1.Items():
         for v2, p2 in pmf2.Items():
             if v1 > v2:
@@ -1722,7 +1751,7 @@ def PmfProbEqual(pmf1, pmf2):
     Returns:
         float probability
     """
-    total = 0.0
+    total = 0
     for v1, p1 in pmf1.Items():
         for v2, p2 in pmf2.Items():
             if v1 == v2:
@@ -1902,6 +1931,32 @@ def MakeExponentialPmf(lam, high, n=200):
     return pmf
 
 
+def EvalParetoPdf(x, xm, alpha):
+    """Computes the Pareto.
+
+    xm: minimum value (scale parameter)
+    alpha: shape parameter
+
+    returns: float probability density
+    """
+    return stats.pareto.pdf(x, alpha, scale=xm)
+
+
+def MakeParetoPmf(xm, alpha, high, num=101):
+    """Makes a PMF discrete approx to a Pareto distribution.
+
+    xm: minimum value (scale parameter)
+    alpha: shape parameter
+    high: upper bound value
+    num: number of values
+
+    returns: normalized Pmf
+    """
+    xs = np.linspace(xm, high, num)
+    ps = stats.pareto.pdf(xs, alpha, scale=xm)
+    pmf = Pmf(dict(zip(xs, ps)))
+    return pmf
+
 def StandardNormalCdf(x):
     """Evaluates the CDF of the standard Normal distribution.
     
@@ -2014,7 +2069,7 @@ def RenderParetoCdf(xmin, alpha, low, high, n=50):
     return xs, ps
 
 
-class Beta(object):
+class Beta:
     """Represents a Beta distribution.
 
     See http://en.wikipedia.org/wiki/Beta_distribution
@@ -2037,6 +2092,12 @@ class Beta(object):
     def Mean(self):
         """Computes the mean of this distribution."""
         return self.alpha / (self.alpha + self.beta)
+
+    def MAP(self):
+        """Computes the value with maximum a posteori probability."""
+        a = self.alpha - 1
+        b = self.beta - 1
+        return a / (a + b)
 
     def Random(self):
         """Generates a random variate from this distribution."""
@@ -2071,6 +2132,9 @@ class Beta(object):
         model of the continuous distribution, and behaves well as
         the number of values increases.
         """
+        if label is None and self.label is not None:
+            label = self.label
+
         if self.alpha < 1 or self.beta < 1:
             cdf = self.MakeCdf()
             pmf = cdf.MakePmf()
@@ -2217,7 +2281,7 @@ def LogBinomialCoef(n, k):
     return n * math.log(n) - k * math.log(k) - (n - k) * math.log(n - k)
 
 
-def NormalProbability(ys, jitter=0.0):
+def NormalProbability(ys, jitter=0):
     """Generates data for a normal probability plot.
 
     ys: sequence of values
@@ -2689,9 +2753,11 @@ def ReadStataDct(dct_file, **options):
     type_map = dict(byte=int, int=int, long=int, float=float, double=float)
 
     var_info = []
-    for line in open(dct_file, **options):
-        match = re.search( r'_column\(([^)]*)\)', line)
-        if match:
+    with open(dct_file, **options) as f:
+        for line in f:
+            match = re.search( r'_column\(([^)]*)\)', line)
+            if not match:
+                continue
             start = int(match.group(1))
             t = line.split()
             vtype, name, fstring = t[1:4]
