@@ -142,6 +142,8 @@ def PrePlot(num=None, rows=None, cols=None):
     size_map = {(1, 1): (8, 6),
                 (1, 2): (12, 6),
                 (1, 3): (12, 6),
+                (1, 4): (12, 5),
+                (1, 5): (12, 4),
                 (2, 2): (10, 10),
                 (2, 3): (16, 10),
                 (3, 1): (8, 10),
@@ -706,6 +708,12 @@ def Save(root=None, formats=None, **options):
       options: keyword args used to invoke various pyplot functions
     """
     clf = options.pop('clf', True)
+
+    save_options = {}
+    for option in ['bbox_inches', 'pad_inches']:
+        if option in options:
+            save_options[option] = options.pop(option)
+
     Config(**options)
 
     if formats is None:
@@ -719,24 +727,25 @@ def Save(root=None, formats=None, **options):
 
     if root:
         for fmt in formats:
-            SaveFormat(root, fmt)
+            SaveFormat(root, fmt, **save_options)
     if clf:
         Clf()
 
 
-def SaveFormat(root, fmt='eps'):
+def SaveFormat(root, fmt='eps', **options):
     """Writes the current figure to a file in the given format.
 
     Args:
       root: string filename root
       fmt: string format
     """
+    _Underride(options, dpi=300)
     filename = '%s.%s' % (root, fmt)
     print('Writing', filename)
-    pyplot.savefig(filename, format=fmt, dpi=300)
+    pyplot.savefig(filename, format=fmt, **options)
 
 
-# provide aliases for calling functons with lower-case names
+# provide aliases for calling functions with lower-case names
 preplot = PrePlot
 subplot = SubPlot
 clf = Clf
